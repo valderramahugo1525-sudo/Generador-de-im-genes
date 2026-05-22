@@ -7,6 +7,10 @@ interface ImageGalleryProps {
     images: GeneratedImage[];
     isLoading: boolean;
     error: string | null;
+    onDelete: (id: string) => void;
+    onUseText: (prompt: string) => void;
+    onRemix: (image: GeneratedImage) => void;
+    onDownload: (src: string, prompt: string) => void;
 }
 
 const LoadingSkeleton: React.FC = () => (
@@ -23,7 +27,7 @@ const LoadingSkeleton: React.FC = () => (
 );
 
 
-export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, isLoading, error }) => {
+export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, isLoading, error, onDelete, onUseText, onRemix, onDownload }) => {
     
     // Group images by date
     const groupedByDate = images.reduce((acc, image) => {
@@ -32,9 +36,9 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, isLoading, e
     }, {} as Record<string, GeneratedImage[]>);
 
     return (
-        <div className="flex-1 p-6 overflow-y-auto">
+        <div className="flex-1 p-6 overflow-y-auto pb-40"> {/* Added padding-bottom */}
             {isLoading && images.length === 0 && <LoadingSkeleton />}
-            {error && <div className="text-red-500 bg-red-900/20 p-4 rounded-lg">{error}</div>}
+            {error && <div className="text-red-500 bg-red-900/20 p-4 rounded-lg mb-4 max-w-3xl mx-auto">{error}</div>}
             
             <div className="max-w-3xl mx-auto space-y-8">
                 {isLoading && images.length > 0 && <LoadingSkeleton />}
@@ -43,7 +47,14 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, isLoading, e
                         <h3 className="text-sm font-semibold text-gray-400 mb-4">{date}</h3>
                         <div className="space-y-6">
                             {imagesOnDate.map(image => (
-                                <GeneratedImageCard key={image.id} image={image} />
+                                <GeneratedImageCard 
+                                    key={image.id} 
+                                    image={image} 
+                                    onDelete={onDelete}
+                                    onUseText={onUseText}
+                                    onRemix={onRemix}
+                                    onDownload={onDownload}
+                                />
                             ))}
                         </div>
                     </div>
@@ -53,7 +64,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({ images, isLoading, e
             {!isLoading && images.length === 0 && !error && (
                  <div className="flex flex-col items-center justify-center h-full text-gray-500">
                     <p className="text-lg">Your generated images will appear here.</p>
-                    <p>Use the panel on the left to create your first image.</p>
+                    <p>Use the prompt bar below to create your first image.</p>
                 </div>
             )}
         </div>

@@ -1,3 +1,4 @@
+
 export interface Model {
     id: string;
     name: string;
@@ -31,4 +32,5 @@ export interface GeneratedImage {
     aspectRatio: string;
     date: string;
     model: string;
+    seed?: number;
 }

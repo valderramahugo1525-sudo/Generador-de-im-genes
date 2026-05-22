@@ -1,14 +1,15 @@
 
 import React from 'react';
 import type { GeneratedImage } from '../types';
-import { BookmarkIcon, RemixIcon, TrashIcon, TextIcon, RoseIcon } from './icons';
+import { BookmarkIcon, RemixIcon, TrashIcon, TextIcon, RoseIcon, DownloadIcon } from './icons';
 
 interface ActionButtonProps {
     icon: React.ReactNode;
     label: string;
+    onClick?: () => void;
 }
-const ActionButton: React.FC<ActionButtonProps> = ({ icon, label }) => (
-    <button className="flex items-center gap-1.5 text-gray-400 hover:text-white text-xs">
+const ActionButton: React.FC<ActionButtonProps> = ({ icon, label, onClick }) => (
+    <button onClick={onClick} className="flex items-center gap-1.5 text-gray-400 hover:text-white text-xs transition-colors">
         {icon}
         <span>{label}</span>
     </button>
@@ -17,8 +18,12 @@ const ActionButton: React.FC<ActionButtonProps> = ({ icon, label }) => (
 
 interface GeneratedImageCardProps {
     image: GeneratedImage;
+    onDelete: (id: string) => void;
+    onUseText: (prompt: string) => void;
+    onRemix: (image: GeneratedImage) => void;
+    onDownload: (src: string, prompt: string) => void;
 }
-export const GeneratedImageCard: React.FC<GeneratedImageCardProps> = ({ image }) => {
+export const GeneratedImageCard: React.FC<GeneratedImageCardProps> = ({ image, onDelete, onUseText, onRemix, onDownload }) => {
     return (
         <div className="bg-[#202127] rounded-lg p-4">
             <div className="flex items-start justify-between mb-3">
@@ -29,15 +34,16 @@ export const GeneratedImageCard: React.FC<GeneratedImageCardProps> = ({ image })
                     <div>
                         <div className="flex items-center gap-2 text-xs text-gray-400">
                             <span>{image.resolution} ({image.aspectRatio})</span>
-                            <span className="bg-gray-700 px-2 py-0.5 rounded-full">Character Ref</span>
+                            {image.seed && <span className="bg-gray-700 px-2 py-0.5 rounded-full">Seed: {image.seed}</span>}
                         </div>
                         <p className="text-gray-200 mt-1 leading-snug text-sm">{image.prompt}</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
-                    <ActionButton icon={<TextIcon />} label="Use Text" />
-                    <ActionButton icon={<RemixIcon />} label="Remix" />
-                    <ActionButton icon={<TrashIcon />} label="Delete" />
+                    <ActionButton icon={<TextIcon />} label="Use Text" onClick={() => onUseText(image.prompt)} />
+                    <ActionButton icon={<RemixIcon />} label="Remix" onClick={() => onRemix(image)} />
+                    <ActionButton icon={<DownloadIcon />} label="Save" onClick={() => onDownload(image.src, image.prompt)} />
+                    <ActionButton icon={<TrashIcon />} label="Delete" onClick={() => onDelete(image.id)} />
                 </div>
             </div>
             <div className="relative group">

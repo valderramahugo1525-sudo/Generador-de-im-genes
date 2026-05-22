@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from "@google/genai";
 import type { GenerationRequest } from '../types';
 
@@ -29,7 +30,8 @@ const generateMockImage = async (request: GenerationRequest): Promise<string[]> 
             images.push(base64);
         } catch (error) {
             console.error("Failed to fetch mock image:", error);
-            images.push(imageUrl);
+            // Fallback to URL if base64 conversion fails
+            images.push(`https://picsum.photos/${request.width}/${request.height}`);
         }
     }
     return images;
@@ -60,7 +62,6 @@ export const generateImage = async (request: GenerationRequest): Promise<string[
     try {
         let finalPrompt = request.prompt;
 
-        // 1. If there's a reference image, use gemini-2.5-flash to describe it first
         if (request.referenceImage) {
             console.log("Analyzing reference image...");
             
@@ -71,31 +72,29 @@ export const generateImage = async (request: GenerationRequest): Promise<string[
             const referenceImageMimeType = mimeTypeMatch[1];
             const referenceImageDataBase64 = request.referenceImage.split(',')[1];
 
-            const imageParts = [{
+            const imagePart = {
                 inlineData: {
                     mimeType: referenceImageMimeType,
                     data: referenceImageDataBase64,
                 },
-            }];
-            const descriptionPrompt = "Describe the person in this image in extreme detail. Focus on facial features, bone structure, eye shape and color, hair style and color, and any unique identifying marks like freckles or scars. The description should be objective, precise, and suitable for an AI image generator to create a photorealistic image of the same person. Avoid describing clothing, expression, or background.";
+            };
+            
+            const descriptionPrompt = "Analyze the person in this image. Create a highly detailed, objective, and factual description of their facial features (e.g., eye shape and color, nose structure, jawline, hair color and texture). This description will be used to recreate the person. Focus only on permanent facial characteristics. Exclude any clothing, background details, lighting, or emotional expressions.";
 
             const descriptionResponse = await ai.models.generateContent({
                 model: 'gemini-2.5-flash',
-                contents: { parts: [...imageParts, { text: descriptionPrompt }] },
+                contents: { parts: [imagePart, { text: descriptionPrompt }] },
             });
-            const imageDescription = descriptionResponse.text;
+            const imageDescription = descriptionResponse.text.trim();
             console.log("Generated image description:", imageDescription);
 
-            // Structure the prompt to combine the scene and the character description
-            finalPrompt = `A photorealistic image of a person with the following exact appearance: [${imageDescription}]. The person is in this scene: "${request.prompt}". It is crucial that the person's appearance matches the description precisely.`;
+            finalPrompt = `A photorealistic image of "${request.prompt}", featuring a person who looks exactly like this: [${imageDescription}]. It is critical to match the facial features from the description.`;
         }
         
-        // 2. Add negative prompt if provided
         if (request.negativePrompt) {
-            finalPrompt += `\n\nNegative Prompt (avoid): ${request.negativePrompt}`;
+            finalPrompt += ` --no ${request.negativePrompt}`;
         }
 
-        // 3. Generate the image using the final prompt
         console.log("Generating image with final prompt:", finalPrompt);
         
         const config: {
@@ -120,16 +119,32 @@ export const generateImage = async (request: GenerationRequest): Promise<string[
         });
         
         if (!response.generatedImages || response.generatedImages.length === 0) {
-            throw new Error('API did not return any images.');
+            // Check for safety ratings or other reasons for empty response
+            // This part of the response structure might vary, adjust based on actual API response
+            const blockReason = (response as any).filters?.[0]?.reason;
+            if (blockReason) {
+                throw new Error(`Image generation blocked due to: ${blockReason}. Please adjust your prompt.`);
+            }
+            throw new Error('API did not return any images. The prompt might be too complex or violate safety policies.');
         }
 
         return response.generatedImages.map(img => `data:image/jpeg;base64,${img.image.imageBytes}`);
         
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error generating image with Gemini API:", error);
-        if (error instanceof Error && error.message.includes('SAFETY')) {
-             throw new Error("Could not generate image due to safety policies. Please modify your prompt.");
+
+        let errorMessage = "An unexpected error occurred while generating the image.";
+
+        if (error.message.includes('API key not valid')) {
+            errorMessage = "API Key is not valid. Please check your API key in the environment variables.";
+        } else if (error.message.includes('quota')) {
+            errorMessage = "You have exceeded your API quota. Please check your billing account or wait for the quota to reset.";
+        } else if (error.message.includes('SAFETY')) {
+            errorMessage = "Could not generate image due to safety policies. Please modify your prompt and try again.";
+        } else if (error.message) {
+            errorMessage = error.message;
         }
-        throw new Error("Failed to generate image. Please check your prompt or API key.");
+
+        throw new Error(errorMessage);
     }
 };
